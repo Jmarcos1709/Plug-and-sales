@@ -20,17 +20,20 @@ def load_and_preprocess_data(uploaded_file):
     
     # Tenta ler o arquivo como CSV. O separador será inferido.
     try:
-        # Tenta ler com o separador mais comum (vírgula)
+        # O objeto 'uploaded_file' do Streamlit é lido diretamente pelo pandas
         df = pd.read_csv(uploaded_file, header=None, sep=',')
     except Exception as e:
         st.error(f"Erro ao ler o arquivo: {e}")
-        return None
+        # Retorna para o pandas poder processar o erro
+        uploaded_file.seek(0) 
+        try:
+            # Tenta com ponto e vírgula como alternativa comum no Brasil
+            df = pd.read_csv(uploaded_file, header=None, sep=';')
+            st.info("Detectado separador ';' e carregado com sucesso.")
+        except Exception as e_alt:
+            st.error(f"Erro ao tentar com separador ';': {e_alt}")
+            return None
 
-    # Renomear as colunas de interesse
-    # Coluna 3 (índice 2) -> Gasto Total de Tráfego
-    # Coluna 22 (índice 21) -> Total de Atendimentos
-    # Coluna 24 (índice 23) -> Número de Vendas
-    
     # Mapeamento de colunas (índice baseado em 0)
     col_map = {
         2: 'Gasto_Trafego',
@@ -41,7 +44,7 @@ def load_and_preprocess_data(uploaded_file):
     # Verifica se as colunas existem no DataFrame
     for index in col_map.keys():
         if index not in df.columns:
-            st.error(f"Erro: A coluna esperada no índice {index+1} não foi encontrada no arquivo.")
+            st.error(f"Erro: A coluna esperada no índice {index+1} (coluna {index}) não foi encontrada no arquivo.")
             return None
 
     # Seleciona e renomeia as colunas
@@ -150,7 +153,7 @@ def plot_traffic_vs_sales(df):
         x='Gasto_Trafego',
         y='Total_Vendas',
         size='Total_Atendimentos', # O tamanho do ponto representa o volume de atendimentos
-        sizes=(50, 1000),         # Define o range do tamanho
+        sizes=(50, 1000),      # Define o range do tamanho
         alpha=0.7,
         edgecolors='DarkSlateGrey',
         ax=ax
@@ -176,12 +179,6 @@ def main():
     uploaded_file = st.sidebar.file_uploader("Carregue seu arquivo CSV/TXT", type=["csv", "txt"])
 
     if uploaded_file is not None:
-        # Para o Streamlit ler o arquivo, precisamos de um objeto de arquivo
-        # O arquivo do usuário foi salvo como /home/ubuntu/upload/dadospreenchidos.txt
-        # Vamos simular o upload para o ambiente de teste
-        if st.session_state.get('test_mode', False):
-            with open("/home/ubuntu/upload/dadospreenchidos.txt", "r") as f:
-                uploaded_file = StringIO(f.read())
         
         df = load_and_preprocess_data(uploaded_file)
 
@@ -222,8 +219,6 @@ def main():
     else:
         st.info("Por favor, carregue um arquivo de dados para começar a análise.")
 
+# Bloco principal para rodar o app
 if __name__ == "__main__":
-    # Define o modo de teste para carregar o arquivo fornecido pelo usuário
-    st.session_state['test_mode'] = True
     main()
-    st.session_state['test_mode'] = False # Desativa o modo de teste após a execução inicial
